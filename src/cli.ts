@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanSqlFiles, parseSqlFile } from './parser.js';
 import { buildSchema } from './analyzer.js';
@@ -58,16 +58,13 @@ function runLint(searchPath: string): void {
   }
 
   // Step 2: Parse each SQL file
+  // Use the search directory (or parent of a single file) as the root for relative paths
+  const resolvedSearchPath = scanResult.files.length === 1
+    ? resolve(dirname(scanResult.files[0]))
+    : resolve(searchPath);
   const parsedFiles = scanResult.files.map((filePath) => {
-    // Compute relative path for display
-    const resolvedRoot = scanResult.files.length > 1
-      ? searchPath
-      : dirname(filePath);
-    const relativePath = filePath.startsWith(resolvedRoot)
-      ? filePath.slice(resolvedRoot.length + 1)
-      : filePath;
-
-    return parseSqlFile(filePath, relativePath);
+    const relativePath = relative(resolvedSearchPath, filePath);
+    return parseSqlFile(filePath, relativePath || filePath);
   });
 
   const parseErrors = parsedFiles.flatMap((pf) => pf.errors);
