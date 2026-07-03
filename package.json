@@ -1,0 +1,43 @@
+{
+  "name": "rls-lint",
+  "version": "0.1.0",
+  "description": "Static security linter for Supabase Row Level Security policies. Catch multi-tenant data leaks before you ship.",
+  "keywords": [
+    "supabase",
+    "postgresql",
+    "security",
+    "cli",
+    "linter",
+    "rls",
+    "typescript"
+  ],
+  "homepage": "https://github.com/NavjotSingh-ca/rls-lint#readme",
+  "bugs": {
+    "url": "https://github.com/NavjotSingh-ca/rls-lint/issues"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "bin": {
+    "rls-lint": "./dist/cli.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "node dist/cli.js ./test-fixtures"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

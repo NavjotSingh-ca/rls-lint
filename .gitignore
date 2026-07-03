@@ -1,0 +1,24 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# build output
+/dist
+
+# TypeScript
+*.tsbuildinfo
+
+# env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE (keep .vscode/settings.json if you want, otherwise uncomment)
+# .vscode/
+
+# debug
+npm-debug.log*
