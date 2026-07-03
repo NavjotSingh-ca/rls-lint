@@ -1,6 +1,6 @@
 {
   "name": "rls-lint",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Static security linter for Supabase Row Level Security policies. Catch multi-tenant data leaks before you ship.",
   "keywords": [
     "supabase",
