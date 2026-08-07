@@ -23,5 +23,23 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
-      - run: node dist/cli.js ./test-fixtures > /dev/null; test $? -eq 1
-      - run: node dist/cli.js ./test-fixtures/clean.sql > /dev/null
+      # CLI smoke: broken fixtures MUST exit 1 (critical findings found).
+      # GitHub Actions runs bash with `set -e`, so disable it here — the
+      # non-zero exit is the expected, asserted outcome.
+      - name: Smoke test — broken fixtures exit 1
+        run: |
+          set +e
+          node dist/cli.js ./test-fixtures > /dev/null
+          code=$?
+          if [ $code -ne 1 ]; then
+            echo "Expected exit code 1 for test-fixtures but got $code"
+            exit 1
+          fi
+      # CLI smoke: clean fixtures MUST exit 0
+      - name: Smoke test — clean fixtures exit 0
+        run: |
+          node dist/cli.js ./test-fixtures/clean.sql > /dev/null
+          if [ $? -ne 0 ]; then
+            echo "Expected exit code 0 for clean.sql"
+            exit 1
+          fi
