@@ -55,7 +55,6 @@ export function printReport(
   if (warningCount > 0) {
     summaryParts.push(chalk.yellow(`${warningCount} warning${warningCount !== 1 ? 's' : ''}`));
   }
-  const cleanCount = sorted.filter((r) => r.severity !== 'critical' && r.severity !== 'warning').length;
 
   console.log(chalk.dim('  ────────────────────────────────────────'));
   console.log(

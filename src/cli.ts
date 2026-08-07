@@ -29,10 +29,19 @@ program
   .version(pkgVersion)
   .argument('[path]', 'Path to SQL migration files or single .sql file', './migrations')
   .action((pathArg: string) => {
-    runLint(pathArg);
+    const exitCode = runLint(pathArg);
+    process.exit(exitCode);
   });
 
-program.parse();
+// Only parse args + run the CLI when executed directly (not when imported
+// by tests). ESM has no require.main; compare against process.argv[1].
+const isDirectRun =
+  typeof process.argv[1] === 'string' &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  program.parse();
+}
 
 /**
  * Core lint workflow:
@@ -40,9 +49,12 @@ program.parse();
  * 2. Parse each file
  * 3. Build the analyzed schema
  * 4. Run all lint rules
- * 5. Print report and exit with appropriate code
+ * 5. Print report and return the appropriate exit code
+ *
+ * Exported separately from the CLI entry point so it can be unit-tested
+ * without invoking process.exit().
  */
-function runLint(searchPath: string): void {
+export function runLint(searchPath: string): number {
   // Step 1: Scan for SQL files
   const scanResult = scanSqlFiles(searchPath);
 
@@ -54,7 +66,7 @@ function runLint(searchPath: string): void {
 
   if (scanResult.files.length === 0) {
     console.error(`Error: No .sql files found at '${searchPath}'`);
-    process.exit(2);
+    return 2;
   }
 
   // Step 2: Parse each SQL file
@@ -78,7 +90,6 @@ function runLint(searchPath: string): void {
   // Step 4: Run all rules
   const allResults = rules.flatMap((rule) => rule(schema));
 
-  // Step 5: Print report and exit
-  const exitCode = printReport(allResults, scanResult.errors.map((e) => e.message));
-  process.exit(exitCode);
+  // Step 5: Print report and return exit code
+  return printReport(allResults, scanResult.errors.map((e) => e.message));
 }

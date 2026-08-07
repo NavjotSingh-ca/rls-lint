@@ -1,6 +1,6 @@
 {
   "name": "rls-lint",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "Static security linter for Supabase Row Level Security policies. Catch multi-tenant data leaks before you ship.",
   "keywords": [
     "supabase",
@@ -16,18 +16,28 @@
     "url": "https://github.com/NavjotSingh-ca/rls-lint/issues"
   },
   "license": "MIT",
-  "author": "",
+  "author": "Navjot Singh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NavjotSingh-ca/rls-lint.git"
+  },
   "type": "module",
   "bin": {
     "rls-lint": "./dist/cli.js"
   },
   "files": [
-    "dist/"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build",
-    "test": "node dist/cli.js ./test-fixtures"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "chalk": "^5.4.1",
@@ -35,9 +45,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
-    "typescript": "^5.8.3"
-  },
-  "engines": {
-    "node": ">=18"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.0"
   }
 }

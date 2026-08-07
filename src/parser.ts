@@ -163,39 +163,118 @@ interface Statement {
 
 /**
  * Split SQL content into individual statements, tracking line numbers.
+ *
+ * Quote-aware: semicolons inside single-quoted strings, double-quoted
+ * identifiers, and dollar-quoted bodies ($$ ... $$, $tag$ ... $tag$)
+ * do NOT terminate a statement.
  */
 function splitStatements(content: string): Statement[] {
   const statements: Statement[] = [];
-  const lines = content.split('\n');
 
-  let currentStmt: string[] = [];
-  let stmtStartLine = 1;
+  // Precompute the 1-indexed line number for every character offset.
+  const lineAt: number[] = new Array(content.length + 1).fill(1);
+  let line = 1;
+  for (let i = 0; i < content.length; i++) {
+    lineAt[i] = line;
+    if (content[i] === '\n') line++;
+  }
+  lineAt[content.length] = line;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    currentStmt.push(line);
+  // Lexical state carried across the whole file
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let dollarQuoteTag: string | null = null;
 
-    // Check if line contains a semicolon (end of statement)
-    // Simple heuristic: if trimmed line ends with semicolon (ignoring trailing whitespace)
-    const trimmed = line.trimEnd();
-    if (trimmed.endsWith(';')) {
-      statements.push({
-        text: currentStmt.join('\n'),
-        line: stmtStartLine,
-      });
-      currentStmt = [];
-      stmtStartLine = i + 2; // +2 because i is 0-indexed, lines are 1-indexed
+  let stmtStart = 0; // offset where the current statement begins
+  let stmtStartLine = 1; // line of the first non-blank char of the statement
+  let seenContent = false;
+  let i = 0;
+
+  while (i < content.length) {
+    const ch = content[i];
+    const next = content[i + 1] ?? '';
+
+    if (!seenContent && !(ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r')) {
+      seenContent = true;
+      stmtStartLine = lineAt[i];
     }
+
+    if (dollarQuoteTag !== null) {
+      if (content.startsWith(dollarQuoteTag, i)) {
+        const closingTag = dollarQuoteTag;
+        dollarQuoteTag = null;
+        i += closingTag.length;
+        continue;
+      }
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      if (ch === "'") {
+        if (next === "'") {
+          i += 2;
+          continue;
+        }
+        inSingleQuote = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      if (ch === '"') {
+        if (next === '"') {
+          i += 2;
+          continue;
+        }
+        inDoubleQuote = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingleQuote = true;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inDoubleQuote = true;
+      i++;
+      continue;
+    }
+    if (ch === '$') {
+      const tagMatch = content.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
+      if (tagMatch) {
+        dollarQuoteTag = tagMatch[0];
+        i += dollarQuoteTag.length;
+        continue;
+      }
+    }
+
+    // Outside any quote — a semicolon terminates the statement. Multiple
+    // statements on one line are handled naturally: the scan continues past
+    // the semicolon and the next statement starts right where this one ended.
+    if (ch === ';') {
+      const text = content.slice(stmtStart, i).trim();
+      if (text) {
+        statements.push({ text, line: stmtStartLine });
+      }
+      seenContent = false;
+      stmtStart = i + 1;
+      i++;
+      continue;
+    }
+
+    i++;
   }
 
-  // Handle last statement without trailing semicolon
-  if (currentStmt.length > 0) {
-    const lastText = currentStmt.join('\n').trim();
+  // Last statement without a trailing semicolon
+  if (seenContent) {
+    const lastText = content.slice(stmtStart).trim();
     if (lastText) {
-      statements.push({
-        text: lastText,
-        line: stmtStartLine,
-      });
+      statements.push({ text: lastText, line: stmtStartLine });
     }
   }
 
@@ -204,12 +283,113 @@ function splitStatements(content: string): Statement[] {
 
 /**
  * Strip SQL comments (both single-line -- and multi-line /* *​/)
+ *
+ * Quote-aware: comment markers inside string literals, quoted identifiers,
+ * and dollar-quoted bodies are preserved, not stripped.
  */
 function stripComments(sql: string): string {
-  // Remove multi-line comments
-  let result = sql.replace(/\/\*[\s\S]*?\*\//g, ' ');
-  // Remove single-line comments
-  result = result.replace(/--[^\n]*/g, ' ');
+  let result = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let dollarQuoteTag: string | null = null;
+
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    if (dollarQuoteTag !== null) {
+      if (sql.startsWith(dollarQuoteTag, i)) {
+        const closingTag = dollarQuoteTag;
+        result += closingTag;
+        dollarQuoteTag = null;
+        i += closingTag.length;
+        continue;
+      }
+      result += ch;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      result += ch;
+      if (ch === "'") {
+        // Double-quote escape inside a string literal
+        if (next === "'") {
+          result += next;
+          i += 2;
+          continue;
+        }
+        inSingleQuote = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      result += ch;
+      if (ch === '"') {
+        if (next === '"') {
+          result += next;
+          i += 2;
+          continue;
+        }
+        inDoubleQuote = false;
+      }
+      i++;
+      continue;
+    }
+
+    // Outside all quotes — comments are real comments here
+    if (ch === '-' && next === '-') {
+      // Single-line comment: consume until end of line
+      while (i < sql.length && sql[i] !== '\n') i++;
+      result += ' ';
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      // Multi-line comment: consume until closing */
+      i += 2;
+      // Preserve the exact number of newlines so that reported line numbers
+      // match the original file (critical for a linter — findings must point
+      // at real lines).
+      let newlineCount = 0;
+      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) {
+        if (sql[i] === '\n') newlineCount++;
+        i++;
+      }
+      if (i < sql.length) i += 2; // skip closing */
+      result += newlineCount > 0 ? '\n'.repeat(newlineCount) : ' ';
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingleQuote = true;
+      result += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inDoubleQuote = true;
+      result += ch;
+      i++;
+      continue;
+    }
+    if (ch === '$') {
+      const dollarMatch = sql.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
+      if (dollarMatch) {
+        dollarQuoteTag = dollarMatch[0];
+        result += dollarQuoteTag;
+        i += dollarQuoteTag.length;
+        continue;
+      }
+    }
+
+    result += ch;
+    i++;
+  }
+
   return result;
 }
 

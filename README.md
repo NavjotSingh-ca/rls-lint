@@ -5,6 +5,7 @@
     <a href="https://www.npmjs.com/package/rls-lint"><img src="https://img.shields.io/npm/v/rls-lint" alt="npm version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/npm/l/rls-lint" alt="MIT license"></a>
     <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/rls-lint" alt="Node version"></a>
+    <a href="https://github.com/NavjotSingh-ca/rls-lint/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/NavjotSingh-ca/rls-lint/ci.yml" alt="CI status"></a>
   </p>
 </p>
 
@@ -67,12 +68,14 @@ npx rls-lint ./supabase/migrations/20250101_create_users.sql
 
 ## Try It Right Now
 
+## Try It Right Now
+
 ```bash
 git clone https://github.com/NavjotSingh-ca/rls-lint.git
 cd rls-lint
 npm install
-npm run build
-npm test
+npm test        # 44 unit + integration tests (vitest)
+npm run build   # compile the CLI
 ```
 
 The repo includes 6 test fixture files in `test-fixtures/` — 5 intentionally broken and 1 clean — so you can see exactly what each rule catches:
